@@ -37,7 +37,6 @@ int main (int argc, char** argv) {
 	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);	// use any interface
 	server_addr.sin_port 		= htons(servport);		// use portno provided by user
 
-
 	// Create socket
 	if ( (sockfd = socket(AF_INET,SOCK_STREAM,0)) < 0 ){
 		std::cout << strerror(errno) << std::endl;
@@ -58,7 +57,6 @@ int main (int argc, char** argv) {
 		return 0;
 	}
 	// std::cout << "Listen successful." << std::endl;
-
 
 	// accept loop
 	for (;;){
@@ -103,8 +101,20 @@ void echo_client(int client_sock){
 	char 	read_buffer[BUFSIZE];	// hold data sent to server
 	int 	n = 0;			// keep track of how many chars the client sent to the server
 
-	// while ( n = read(client_fd, (void*)&read_buffer, BUFSIZE) ){
-		
-	// }
+	while ( n = recv(client_sock, (void*)&read_buffer, BUFSIZE, 0) ){
+
+		// print message to output
+		std::cout << "\nRecieved: " << read_buffer << std::flush;
+
+		// send message back
+		while ( (send(client_sock,(void*)read_buffer,BUFSIZE, 0) ) != 0)
+
+		// check if received message was end of line
+		if ( (strstr(read_buffer,"\n"))!=NULL ){
+			n = 0;
+			break;
+		}
+
+	}
 
 }
