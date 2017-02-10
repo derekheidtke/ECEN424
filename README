@@ -1,0 +1,15 @@
+
+DESCRIPTION:
+
+
+USAGE:
+Server usage:
+
+	$ echos [port_no]
+
+Client usage:
+
+	$ echo [IPv4_servaddr] [port_no]
+
+
+ERRATA:

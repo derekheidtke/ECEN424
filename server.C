@@ -9,9 +9,11 @@
 #include <iostream>
 
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <netinet/in.h>
 
-void echo_client(int client_sock);
+void writen();
+int readline(int , char*, int );
 
 int main (int argc, char** argv) {
 
@@ -81,7 +83,7 @@ int main (int argc, char** argv) {
 				std::cout << strerror(errno) << std::endl;
 			}
 			// process client's request
-			echo_client(clientfd);
+			// readline(clientfd);
 
 			// exit
 			exit(0);
@@ -95,26 +97,44 @@ int main (int argc, char** argv) {
 	return 0;
 }
 
-void echo_client(int client_sock){
+// exit function either when newline/EOF appears or if maximum string length occurs
+int readline(int client_sock, char* buffer, int max_length){
 
-	size_t	BUFSIZE = 1024;			// set max buffer size
-	char 	read_buffer[BUFSIZE];	// hold data sent to server
-	int 	n = 0;			// keep track of how many chars the client sent to the server
+	int		n = 0;				// keep track of how many chars the client sent to the server
+	int		errVal = 0;
 
-	while ( n = recv(client_sock, (void*)&read_buffer, BUFSIZE, 0) ){
 
-		// print message to output
-		std::cout << "\nRecieved: " << read_buffer << std::flush;
+	std::cin;
+	// while ( n < max_length ) {
+	// 	// Read some from socket descriptor
+	// 	errVal = recv(client_sock, (void*)&buffer, max_length, 0);
 
-		// send message back
-		while ( (send(client_sock,(void*)read_buffer,BUFSIZE, 0) ) != 0)
+	// 	// Check for EOF
+	// 	if (errVal == 0) {
+	// 		break;
+	// 	}
 
-		// check if received message was end of line
-		if ( (strstr(read_buffer,"\n"))!=NULL ){
-			n = 0;
-			break;
-		}
+	// 	// Check for newline
+	// 	if ( (strstr(buffer,"\n"))!=NULL ){
+	// 		// store newline and null terminator
+	// 		buffer[n] = "\0";
+	// 		return n;
+	// 	}
 
-	}
+
+	// 	// Check for EINTR
+
+	// 	// print message to output
+	// 	std::cout << "\nRecieved: " << read_buffer << std::flush;
+
+	// 	// send message back
+	// 	while ( (send(client_sock,(void*)read_buffer,BUFSIZE, 0) ) != 0) {
+	// 		if (errno == EINTR)
+	// 	}
+		
+
+	// }
+
+	return n;
 
 }
