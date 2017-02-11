@@ -16,11 +16,11 @@
 
 int main (int argc, char** argv) {
 
-	int 				servport, sockfd;//, serverfd;
-	struct sockaddr_in 	serv_addr, client_addr;
+	int 				SERVPORT, sockfd;//, serverfd;
+	struct sockaddr_in 	serv_addr;
 	char*				servAddrsString;
-	socklen_t			server_len;
-	in_addr_t			serverAddressIPv4;
+
+	std::string 		inputString;
 
 	// Get IP addr and port number of server from command line
 	if (argc != 3){
@@ -31,20 +31,19 @@ int main (int argc, char** argv) {
 	servAddrsString = argv[1];
 	std::cout << "IP_addr: " << servAddrsString << std::endl;
 
-	servport = atoi(argv[2]);
-	std::cout << "Port_Num: " << servport << std::endl;
+	SERVPORT = atoi(argv[2]);
+	std::cout << "Port_Num: " << SERVPORT << std::endl;
 
 	// Preliminary stuff
-	bzero(&serv_addr,sizeof(client_addr));
-	client_addr.sin_family 		= AF_INET;				// use IPv4 protocol
-	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);	// use any interface
-	client_addr.sin_port 		= htons(0);				// use ephemeral port
-
-	inet_pton(AF_INET,servAddrsString,&serverAddressIPv4);
 	bzero(&serv_addr,sizeof(serv_addr));
 	serv_addr.sin_family 		= AF_INET;				// use IPv4 protocol
-	serv_addr.sin_addr.s_addr 	=  serverAddressIPv4;	// use addr provided by user
-	serv_addr.sin_port 			= htons(servport);		// use portno provided by user
+	serv_addr.sin_port 			= htons(SERVPORT);		// use portno provided by user
+	
+	if ( inet_pton(AF_INET, servAddrsString, &serv_addr.sin_addr) != 1 ) {
+		std::cout << "Address conversion error.\n" << std::flush;
+		std::cout << strerror(errno) << std::endl;
+		return 0;
+	}
 
 	// Create socket
 	if ( (sockfd = socket(AF_INET,SOCK_STREAM,0)) < 0 ){
@@ -53,18 +52,17 @@ int main (int argc, char** argv) {
 	}
 	std::cout << "Socket created successfully." << std::endl;
 
-	// Bind socket to port/IP address
-	if ( (bind(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) ) != 0 ){
+	// Connect to server
+	if ( (connect(sockfd, (struct sockaddr*)&serv_addr,sizeof(serv_addr))) != 0 ) {
 		std::cout << strerror(errno) << std::endl;
 		return 0;
 	}
-	std::cout << "Bind successful." << std::endl;
+	std::cout << "Connected to server!" << std::endl;
 
-	// // Connect to server
-	// if ( (connect(sockfd, (struct sockaddr*),)) != 0 ) {
-	// 	std::cout << strerror(errno) << std::endl;
-	// 	return 0;
-	// }
+	std::cout << "\nEnter string: " << std::flush;
+	std::cin >> inputString;
+
+
 
 	return 0;
 }

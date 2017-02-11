@@ -103,7 +103,6 @@ int readline(int client_sock, char* buffer, int max_length){
 	int		n = 0;				// keep track of how many chars the client sent to the server
 	int		errVal = 0;
 
-
 	std::cin;
 	// while ( n < max_length ) {
 	// 	// Read some from socket descriptor

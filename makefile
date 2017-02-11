@@ -10,4 +10,4 @@ mycli: my_client.C
 	g++ my_client.C -o "myecho"
 
 clean:
-	rm "echos" "echo"
+	rm "echos" "echo" "myecho"
