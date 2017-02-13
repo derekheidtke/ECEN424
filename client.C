@@ -18,72 +18,64 @@
 #include <sys/select.h>			// for select() system call only
 #include <sys/time.h>				// time() & clock_gettime()
 
-#include <string>
-#include <iostream>
-
 
 int main (int argc, char **argv) {
-	int sockfd;
+	int sockfd, servport;
 	struct sockaddr_in servaddr;
-	// struct sockaddr;
-	char cli_msg[1024];
 	char buffer[1024];
-
-	int SERV_PORT = 0;
-
-	std::string inputString;
 	
-	// Get IP addr and port number of server from command line
-	if (argc != 3){
-		// std::cout << "Usage: echos [IPv4_addr] [port_no]\n" << std::endl;
-		return 0;
+	if (argc != 3) {
+		printf("Error: Input IPv4 address then socket number surrounded individually by quotations after run argument\n");
+		return(-1);
 	}
-
-	// std::cout << "IP_addr: " << argv[1] << std::endl;
-
-	SERV_PORT = atoi(argv[2]);
-	// std::cout << "Port_Num: " << SERVPORT << std::endl;
+	
+	servport = atoi(argv[2]);
 	
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	
 	if (sockfd < 0) {
 		printf("Error: Could not open socket.\n");
+		return(-1);
 	}
 	
 	servaddr.sin_family = AF_INET;
-	servaddr.sin_port = htons(SERV_PORT);
+	servaddr.sin_port = htons(servport);
 	bzero(&servaddr, sizeof(servaddr));
 	inet_pton(AF_INET, argv[1], &servaddr.sin_addr);
 	
-	if (connect(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0) {
+	if (&servaddr.sin_addr <= 0) {
+		printf("Error: Invalid Address.\n");
+		return(-1);
+	}
+	
+	if (connect(sockfd, (struct sockaddr*) &servaddr, sizeof(servaddr)) < 0) {
 		printf("Error: Socket is closed.\n");
+		return(-1);
 	}
 	else {
-			connect(sockfd, (sockaddr *) &servaddr, sizeof(servaddr));
+			connect(sockfd, (struct sockaddr*) &servaddr, sizeof(servaddr));
 	}
 	
 	bzero(buffer, 1024);
-
-	// while(fgets(cli_msg, 1024, FILE *fp) != NULL) {
-		// fgets(cli_msg, 1024, 0);
-
-		std::cout << "\nEnter string: " << std::flush;
-		std::cin >> inputString;
-
-		if (write(sockfd, inputString.c_str(), inputString.size()) < 0) {
+	
+	while(fgets(buffer, 1024, stdin) != NULL) {
+		
+		if (write(sockfd, buffer, strlen(buffer)) < 0) {
 			printf("Error: Could not write to Socket.\n");
+			return(-1);
 		}
-		else write(sockfd, inputString.c_str(), inputString.size() );
+		else write(sockfd, buffer, strlen(buffer));
 		
 		bzero(buffer, 1024);
 		
 		if (read(sockfd, buffer, 1024) < 0) {
 			printf("Error: Could not read from Socket.\n");
+			return(-1);
 		}
 		else read(sockfd, buffer, 1024);
 		
 		printf("Echo received: %s", buffer);
-	// }
+	}
 	
 	close(sockfd);
 	exit(0);
