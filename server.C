@@ -26,7 +26,7 @@ int main (int argc, char** argv) {
 	socklen_t			client_len;
 	pid_t				child_pid;
 
-	size_t 				MAXLINE = 1024;
+	size_t 				MAXLINE = 255;
 	char 				buffer[MAXLINE];
 
 	const int BACKLOG = 10;		// parameter for listen() call

@@ -30,7 +30,7 @@ int main (int argc, char** argv) {
 
 	std::string 		inputString;
 
-	size_t 				MAXLINE = 1024;
+	size_t 				MAXLINE = 255;
 	char 				sendBuffer[MAXLINE];
 	char 				recvBuffer[MAXLINE];
 
@@ -70,36 +70,7 @@ int main (int argc, char** argv) {
 	}
 	std::cout << "Connected to server!" << std::endl;
 
-
 	// interact with server
-
-	// int len = inputString.size();
-
-	// int count = 0;
-	// while ( numSend < len) {
-	// 	count = send(sockfd, inputString.c_str(), len, 0);
-	// 	if ( count == -1 ) {
-	// 		std::cout << strerror(errno) << std::endl;
-	// 		return 0;
-	// 	}
-	// 	numSend += count;
-	// }
-	// if ( (numSend = send(sockfd, inputString.c_str(), len, MSG_NOSIGNAL)) == -1 ) {
-	// 	std::cout << strerror(errno) << std::endl;
-	// 	return 0;
-	// }
-	// // print data sent by server
-	// count = recv(sockfd, buffer, MAXLINE,0);
-	// while ( count >= 0 ) {
-	// 	numRecv += count;
-	// 	if (count == 0) {
-	// 		break;
-	// 	}
-	// }
-	// if (count == -1 ) {
-	// 	std::cout << strerror(errno) << std::endl;
-	// 	return 0;
-	// }
 
 	int err = 0;
 	// clear buffers before use
@@ -108,22 +79,17 @@ int main (int argc, char** argv) {
 
 	// get string from user
 	printf("\nEnter string: ");
-	fgets(sendBuffer, MAXLINE,stdin);
+	fgets(sendBuffer, MAXLINE, stdin);
 
-	// send string to server 
-	if ( (err = send(sockfd,sendBuffer,strlen(sendBuffer)+1,0) ) == -1 ) {
-		perror("send()");
-		return 0;
-	}
+	// send string to server
+	writen(sockfd, sendBuffer, strlen(sendBuffer));
 
 	// read string back from server
-	if ( (err = recv(sockfd,recvBuffer,MAXLINE,0)) == -1 ) {
-		perror("recv()");
+	if ( readline(sockfd, recvBuffer, MAXLINE) < 0){
+		perror("client readline()");
 		return 0;
 	}
 	printf("From server: %s",recvBuffer);
-
-
 
 	return 0;
 }
@@ -144,7 +110,7 @@ int writen(int sockfd, char* buffer, int length){
 		} else if (err == -1) {
 			// break if more serious error
 			perror("writen()");
-			break;
+			return -1;
 		}
 
 		// keep track of sent characters
@@ -152,11 +118,51 @@ int writen(int sockfd, char* buffer, int length){
 
 		// should never happen
 		if (count > length) {
-			printf("\nWRITEN() ERROR!");
-			break;
+			// printf("\nWRITEN() ERROR!");
+			return -1;
 		}
 	}
 
 	return count;
 
+}
+
+// robust readline from socket connection
+int readline(int sockfd, char* buffer, int buflength) {
+
+	int		err = 0;
+	int		count = 0;	// keep track of how many chars the client sent to the server
+
+	while ( count < buflength ) {
+
+		err = recv(sockfd, buffer, buflength, 0);
+
+		// if end of file, i.e. if no newline found in string
+		if ( strstr(buffer, "\n") != NULL ) {
+			break;
+		}
+
+		if (err == 0) { // also, end of file
+			break;
+		}
+
+		if (err == -1 && errno == EINTR) {
+			// try again if interrupted
+			continue;
+		} else if (err == -1) {
+			perror("readline()");
+			return -1;
+		}
+
+		count += err;
+
+
+		// should not happen
+		if (count > buflength) {
+			printf("\nREADLINE() ERROR!");
+			break;
+		}
+	}
+
+	return count;
 }
