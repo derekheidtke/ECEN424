@@ -20,16 +20,16 @@
 
 
 int main (int argc, char **argv) {
-	int sockfd;
+	int sockfd, servport;
 	struct sockaddr_in servaddr;
-	char cli_msg[1024];
 	char buffer[1024];
-	FILE * fp;
 	
-	if (argc != 2) {
-		printf("Error: Address currently in use.\n");
+	if (argc != 3) {
+		printf("Error: Input IPv4 address then socket number surrounded individually by quotations after run argument\n");
 		return(-1);
 	}
+	
+	servport = atoi(argv[2]);
 	
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	
@@ -39,9 +39,14 @@ int main (int argc, char **argv) {
 	}
 	
 	servaddr.sin_family = AF_INET;
-	servaddr.sin_port = htons(12);
+	servaddr.sin_port = htons(servport);
 	bzero(&servaddr, sizeof(servaddr));
 	inet_pton(AF_INET, argv[1], &servaddr.sin_addr);
+	
+	if (&servaddr.sin_addr <= 0) {
+		printf("Error: Invalid Address.\n");
+		return(-1);
+	}
 	
 	if (connect(sockfd, (struct sockaddr*) &servaddr, sizeof(servaddr)) < 0) {
 		printf("Error: Socket is closed.\n");
@@ -53,12 +58,8 @@ int main (int argc, char **argv) {
 	
 	bzero(buffer, 1024);
 	
-	 if (fp == NULL) {
-		 printf("Error: Could not open file.\n");
-		 return(-1);
-	}
-	
-	while(fgets(cli_msg, 1024, fp) != NULL) {
+	while(fgets(buffer, 1024, stdin) != NULL) {
+		
 		if (write(sockfd, buffer, strlen(buffer)) < 0) {
 			printf("Error: Could not write to Socket.\n");
 			return(-1);
@@ -76,6 +77,6 @@ int main (int argc, char **argv) {
 		printf("Echo received: %s", buffer);
 	}
 	
-	fclose(sockfd);
+	close(sockfd);
 	exit(0);
 }
