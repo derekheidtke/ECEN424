@@ -3,6 +3,7 @@
 
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>
 #include <string.h>
 
@@ -12,15 +13,21 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 
-void writen();
+int writen(int, char*, int);
 int readline(int , char*, int );
 
 int main (int argc, char** argv) {
 
 	int 				servport, sockfd, clientfd;
+	int 				numSend = 0;
+	int 				numRecv = 0;
+
 	struct sockaddr_in 	server_addr, client_addr;
 	socklen_t			client_len;
 	pid_t				child_pid;
+
+	size_t 				MAXLINE = 1024;
+	char 				buffer[MAXLINE];
 
 	const int BACKLOG = 10;		// parameter for listen() call
 
@@ -82,10 +89,25 @@ int main (int argc, char** argv) {
 			if ( (close(sockfd)) != 0 ) {
 				std::cout << strerror(errno) << std::endl;
 			}
-			// process client's request
-			// readline(clientfd);
+			// process client's request ============================================
 
-			// exit
+			// read data from client
+			// clear buffer before use
+			bzero( buffer, MAXLINE);
+
+			// read socket descriptor
+			if ( readline(clientfd, buffer, MAXLINE) < 0){
+				perror("server readline()");
+				break;
+			}
+
+			printf("From client: %s", buffer);
+			std::cout << std::endl;
+
+
+			writen(clientfd, buffer, strlen(buffer));
+
+			// exit ===============================================================
 			exit(0);
 		}
 		// parent process: (close previous client socket and listen for next client)
@@ -97,43 +119,75 @@ int main (int argc, char** argv) {
 	return 0;
 }
 
-// exit function either when newline/EOF appears or if maximum string length occurs
-int readline(int client_sock, char* buffer, int max_length){
+// robust loop to send string across connection-based socket
+int writen(int sockfd, char* buffer, int length){
 
-	int		n = 0;				// keep track of how many chars the client sent to the server
-	int		errVal = 0;
+	int		err = 0;
+	int		count = 0;	// keep track of how many chars the client sent to the server
+	
+	// write to socket descriptor
+	while ( count != length ) {
+		err = send(sockfd,buffer,length+1,0);
 
-	std::cin;
-	// while ( n < max_length ) {
-	// 	// Read some from socket descriptor
-	// 	errVal = recv(client_sock, (void*)&buffer, max_length, 0);
+		if (err == -1 && errno == EINTR) {
+			// try again if interrupted
+			continue;
+		} else if (err == -1) {
+			// break if more serious error
+			perror("writen()");
+			return -1;
+		}
 
-	// 	// Check for EOF
-	// 	if (errVal == 0) {
-	// 		break;
-	// 	}
+		// keep track of sent characters
+		count += err;
 
-	// 	// Check for newline
-	// 	if ( (strstr(buffer,"\n"))!=NULL ){
-	// 		// store newline and null terminator
-	// 		buffer[n] = "\0";
-	// 		return n;
-	// 	}
+		// should never happen
+		if (count > length) {
+			// printf("\nWRITEN() ERROR!");
+			return -1;
+		}
+	}
+
+	return count;
+
+}
+
+// robust readline from socket connection
+int readline(int sockfd, char* buffer, int buflength) {
+
+	int		err = 0;
+	int		count = 0;	// keep track of how many chars the client sent to the server
+
+	while ( count < buflength ) {
+
+		err = recv(sockfd, buffer, buflength, 0);
+
+		// if end of file, i.e. if no newline found in string
+		if ( strstr(buffer, "\n") != NULL ) {
+			break;
+		}
+
+		if (err == 0) { // also, end of file
+			break;
+		}
+
+		if (err == -1 && errno == EINTR) {
+			// try again if interrupted
+			continue;
+		} else if (err == -1) {
+			perror("readline()");
+			return -1;
+		}
+
+		count += err;
 
 
-	// 	// Check for EINTR
+		// should not happen
+		if (count > buflength) {
+			printf("\nREADLINE() ERROR!");
+			break;
+		}
+	}
 
-	// 	// print message to output
-	// 	std::cout << "\nRecieved: " << read_buffer << std::flush;
-
-	// 	// send message back
-	// 	while ( (send(client_sock,(void*)read_buffer,BUFSIZE, 0) ) != 0) {
-	// 		if (errno == EINTR)
-	// 	}
-		
-
-	// }
-
-	return n;
-
+	return count;
 }
