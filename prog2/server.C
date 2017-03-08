@@ -38,7 +38,8 @@ int main (int argc, char** argv) {
 	socklen_t			client_len;
 	pid_t				child_pid;
 
-	char 				buffer[MAXLINE];
+	uint8_t				buffer[MAXLINE];
+	uint8_t*			end;
 
 	SBPCMessage			message;
 	SBCPAttribute*		attrList;
@@ -98,7 +99,7 @@ int main (int argc, char** argv) {
 	for (;;){
 		rset = allset;
 
-		std::cout << "Selecting ...\n" << std::flush;
+		// std::cout << "Selecting ...\n" << std::flush;
 		// check which clients are ready to be read from
 		if ((numready = select(maxfd+1, &rset, NULL, NULL, NULL) ) < 0) {
 			std::cout << strerror(errno) << std::endl;
@@ -157,24 +158,26 @@ int main (int argc, char** argv) {
 					std::cout << "Client: " << buffer << std::flush;
 
 					// get the new data from client
-					networkToStruct(buffer, &message, attrList);
+					deserializePacket(buffer, &message, attrList);
 
-					message.vrsn = 3;
-					message.type = MESS_TYPE_FWD;
-					message.length = 0;
+					createMess(&message,0xFFF,0xFFF,0xFFF);
+					// createMess(&message,3,MESS_TYPE_FWD,1);
 
-					std::cerr << "XXXXXXXXXXXXXXXXXX\n"<<std::flush;
+					attrList = (SBCPAttribute*)malloc(sizeof(SBCPAttribute));
+					createAttr(&attrList[0],ATTR_TYPE_MESS,8);
 					char temp[8] = "abcdefg";
-					attrList[0].type = ATTR_TYPE_MESS;
 					attrList[0].payload = temp;
-					attrList[0].length = 8;
 
 
-					structToNetwork(buffer,message,attrList,1);
-
+					serializePacket(buffer, MAXLINE, message,attrList,1);
 
 					std::cout << "Writing: " << buffer << std::flush;
 					write(sockfd, buffer, MAXLINE);
+
+
+					// reset all data structures: buffer, message, attrList
+					bzero(buffer,MAXLINE);
+					free(attrList);
 				}
 
 				// if no more available descriptors
