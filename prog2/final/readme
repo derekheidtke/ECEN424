@@ -1,0 +1,43 @@
+
+Programming Assignment 2
+
+Derek Heidtke and Ryan Hill
+
+======================================================
+Roles:
+
+Derek Heidtke
+	- server.C and headers.H files
+
+Ryan Hill
+	- client.C
+
+======================================================
+Test Cases:
+
+code does not yet work, so test cases cannot be tested yet.
+
+======================================================
+Architecture:
+
+Header:
+	The header contains declarations and definitions of the structures used to encapsulate the SBCP frame
+	types of message and attribute. These are defined as bitfields. Also in this file are wrapper functions
+	for filling in the members of these struct types (createMess() and createAtrr(), respectively); constant
+	definitions of the frame types (for code readability); and functions to serialize and deserialize the
+	packets so they can be sent over the sockets.
+
+Server:
+
+	the server uses the typical client accept() loop with one modification: the accept is enclosed inside 
+	of a loop conditioned on the select() call. The select() multiplexes the file descriptors of all clients
+	that attempt to connect. After each call to select() the server checks which file descriptor has data ready,
+	then reads from the corresponding client. After this, the processing of the packet takes place, and the
+	server acts appropriately, often times sending out packets of its own.
+
+Client:
+	
+	the client uses a loop which waits for keyboard or socket data inputs to reader data from either input. If
+	the input is from the keyboard then the program changes the data to a sendable network packet and sends it
+	to the server. If the input is from the socket then it is changed from a network packet to a message format
+	and written to the screen.

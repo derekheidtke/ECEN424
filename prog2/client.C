@@ -15,7 +15,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include "headers.h"
+#include "headers.H"
 
 int writen(int, char*, int);
 int readline(int , char*, int );

@@ -1,0 +1,646 @@
+=====================================================================================================
+|---------------------------------------------------------------------------------------------------|
+=====================================================================================================
+readme: 
+
+
+Programming Assignment 2
+
+Derek Heidtke and Ryan Hill
+
+======================================================
+Roles:
+
+Derek Heidtke
+	- server.C and headers.H files
+
+Ryan Hill
+	- client.C
+
+======================================================
+Test Cases:
+
+code does not yet work, so test cases cannot be tested yet.
+
+======================================================
+Architecture:
+
+Header:
+	The header contains declarations and definitions of the structures used to encapsulate the SBCP frame
+	types of message and attribute. These are defined as bitfields. Also in this file are wrapper functions
+	for filling in the members of these struct types (createMess() and createAtrr(), respectively); constant
+	definitions of the frame types (for code readability); and functions to serialize and deserialize the
+	packets so they can be sent over the sockets.
+
+Server:
+
+	the server uses the typical client accept() loop with one modification: the accept is enclosed inside 
+	of a loop conditioned on the select() call. The select() multiplexes the file descriptors of all clients
+	that attempt to connect. After each call to select() the server checks which file descriptor has data ready,
+	then reads from the corresponding client. After this, the processing of the packet takes place, and the
+	server acts appropriately, often times sending out packets of its own.
+
+Client:
+	
+	the client uses a loop which waits for keyboard or socket data inputs to reader data from either input. If
+	the input is from the keyboard then the program changes the data to a sendable network packet and sends it
+	to the server. If the input is from the socket then it is changed from a network packet to a message format
+	and written to the screen.
+
+
+=====================================================================================================
+|---------------------------------------------------------------------------------------------------|
+=====================================================================================================
+makefile:
+
+all: server.C client.C
+
+server: server.C
+	g++ -g server.C -o "server"
+
+client: client.C
+	g++ client.C -o "client"
+
+mycli: my_client.C
+	g++ -g my_client.C -o "myclient"
+
+clean:
+	rm "server" "client" "myclient"
+
+
+=====================================================================================================
+|---------------------------------------------------------------------------------------------------|
+=====================================================================================================
+headers.H:
+
+// Written by Derek Heidtke
+
+struct SBCPAttribute;
+struct SBCPMessage;
+
+typedef struct SBCPAttribute{
+	uint16_t		type	:16;
+	uint16_t		length	:16;
+	char* 			payload;
+} SBCPAttribute;
+
+
+typedef struct SBCPMessage{
+	uint16_t		vrsn	:9;
+	uint16_t		type	:7;
+	uint16_t		length	:16;
+} SBPCMessage;
+
+static inline void createMess (SBCPMessage* message,int vrsn, int type, int length) {
+	message->vrsn 	= (vrsn & 0x1FF);
+	message->type 	= (type & 0x7F);
+	message->length = (length & 0xFFFF);
+}
+
+static inline void createAttr (SBCPAttribute* attr, int type, int length) {
+	attr->type 		= (type & 0xFFFF);
+	attr->length 	= (length & 0xFFFF);
+}
+
+
+const int MESS_TYPE_JOIN	= 2;
+const int MESS_TYPE_SEND	= 4;
+const int MESS_TYPE_FWD		= 3;
+
+const int ATTR_TYPE_USER	= 2;
+const int ATTR_TYPE_MESS	= 4;
+const int ATTR_TYPE_REAS	= 1;
+const int ATTR_TYPE_CLCT	= 3;
+
+
+// converts raw network traffic into SBCPMessage structure, returns the length of the entire message
+int deserializePacket(uint8_t* buffer, SBCPMessage* message, SBCPAttribute** attrList) {
+
+
+	// number of bytes left to be read
+	int remainingLen = message->length;
+	// next  = address of next byte to be read
+	uint8_t* 	next = (uint8_t*)message;
+
+	int currentAttr = -1;
+
+	// Read outer layer of message (guaranteed 4 bytes)
+	*next = buffer[0]; next++; remainingLen--;
+	*next = buffer[1]; next++; remainingLen--;
+	*next = buffer[2]; next++; remainingLen--;
+	*next = buffer[3]; next++; remainingLen--;
+
+	// processing one or more attributes
+	while (remainingLen > 0) {
+
+		currentAttr++;
+
+		// read 4 bytes from next attribute
+		attrList[currentAttr] = (SBCPAttribute*)next;
+
+		
+
+	}
+
+
+}
+
+// converts SBCPMessage to sendable network packet.
+// returns pointer to next available free byte, NULL on error
+uint8_t* serializePacket(uint8_t* buffer, int MAXLINE, SBCPMessage message, SBCPAttribute** attrList, int numAttr) {
+
+	// reset the buffer
+	bzero(buffer,MAXLINE);
+
+	uint8_t*	temp;
+	uint8_t*	end = buffer;
+
+	// construct text string from structure contents
+	// message is 4 bytes
+	temp = (uint8_t*)&message;
+	*end = temp[0]; end++;
+	*end = temp[1]; end++;
+	*end = temp[2]; end++;
+	*end = temp[3]; end++;
+
+	// add attributes to the buffer
+	for (int i = 0; i<numAttr; i++) {
+
+		temp = (uint8_t*)attrList[i];
+
+		// append the ith attribute header
+		*end = temp[0]; end++;
+		*end = temp[1]; end++;
+		*end = temp[2]; end++;
+		*end = temp[3]; end++;
+
+		temp = (uint8_t*)(attrList[i]->payload);
+
+		for (int k = 0; k<(attrList[i]->length); k++ ){
+			*end = temp[k]; end++;
+		}
+		// *end = '\0'; end++;
+	}
+
+	return end;
+}
+
+void printMessage (SBCPMessage* message) {
+	std::cout << "\nMESSAGE:\nvrsn: " << message->vrsn << "\ntype: " << message->type << "\nlength: " << message->length << std::endl;
+}
+
+void printAttribute (SBCPAttribute* attr) {
+	std::cout << "\nMESSAGE:\ntype: " << attr->type << "\nlength: " << attr->length << "\npayload: "<< attr->payload << std::endl;
+}
+
+
+=====================================================================================================
+|---------------------------------------------------------------------------------------------------|
+=====================================================================================================
+server.C:
+
+// Echo Server
+// Written by: Derek Heidtke
+
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+
+#include <iostream>
+
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <sys/select.h>
+
+#include "headers.H"
+
+int writen(int, char*, int);
+int readline(int , char*, int );
+
+int main (int argc, char** argv) {
+
+	const int 			BACKLOG = 10;		// parameter for listen() call
+	size_t 				MAXLINE = 255;
+	int 				MAXNUMCLIENTS = 32;
+	int 				MAX_CLIENTS;
+
+	int 				servport, listenfd, clientfd, sockfd, maxfd, maxk, numready, k;
+	int 				numSend = 0;
+	int 				numRecv = 0;
+	int 				client[MAXNUMCLIENTS];
+	ssize_t				n;
+
+	fd_set				rset, allset;
+
+	struct sockaddr_in 	server_addr, client_addr;
+	socklen_t			client_len;
+	pid_t				child_pid;
+
+	uint8_t				buffer[MAXLINE];
+	uint8_t*			end;
+
+	SBPCMessage			message;
+	SBCPAttribute*		attrList[16] = {0};
+	int 				length;
+
+
+
+	// Get port number from command line
+	if (argc != 3){
+		std::cout << "Usage: server <port_no> <max_clients>\n" << std::endl;
+		return 0;
+	}
+	servport = atoi(argv[1]);
+	std::cout << "Port_Num: " << servport << std::endl;
+	MAX_CLIENTS = atoi(argv[2]);
+	std::cout << "Max_Clients: " << MAX_CLIENTS << std::endl;
+
+	// Preliminary stuff
+	bzero(&server_addr,sizeof(server_addr));
+	bzero(&client_addr,sizeof(client_addr));
+	server_addr.sin_family 		= AF_INET;				// use IPv4 protocol
+	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);	// use any interface
+	server_addr.sin_port 		= htons(servport);		// use portno provided by user
+
+	// Create socket
+	if ( (listenfd = socket(AF_INET,SOCK_STREAM,0)) < 0 ){
+		std::cout << strerror(errno) << std::endl;
+		return 0;
+	}
+	// std::cout << "Socket created successfully." << std::endl;
+	// Bind socket to port/IP address
+	if ( (bind(listenfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) ) != 0 ){
+		std::cout << strerror(errno) << std::endl;
+		return 0;
+	}
+	// std::cout << "Bind successful." << std::endl;
+	// Listen for clients on listening port
+	if ( (listen(listenfd,BACKLOG)) < 0 ) {
+		std::cout << strerror(errno) << std::endl;
+		return 0;
+	}
+	// std::cout << "Listen successful." << std::endl;
+
+	// initialize maxfd to listenfd file descriptor
+	maxfd = listenfd;
+	maxk = -1;
+
+	for ( k = 0 ; k < MAXNUMCLIENTS ; k++) {
+		client[k] = -1;
+	}
+	// initialize and turn on bit "listenfd"
+	FD_ZERO(&allset);
+	FD_SET(listenfd, &allset);
+
+	// processing loop
+	// accepts new clients, uses select to read/write to available client fds.
+	for (;;){
+		rset = allset;
+
+		// std::cout << "Selecting ...\n" << std::flush;
+		// check which clients are ready to be read from
+		if ((numready = select(maxfd+1, &rset, NULL, NULL, NULL) ) < 0) {
+			std::cout << strerror(errno) << std::endl;
+		}
+
+		// if there is a new connection
+		if (FD_ISSET(listenfd, &rset)) {
+
+			// accept client and get new file descriptor for it. them?
+			client_len = sizeof(client_addr);
+			if ((clientfd = accept(listenfd, (struct sockaddr*)&client_addr, &client_len)) < 0){
+				std::cout << strerror(errno) << std::endl;
+				return 0;
+			}
+		
+			// insert new client file descriptor into list of available descr. (client[])
+			for ( k = 0; k < MAXNUMCLIENTS ; k++) {
+				if (client[k] < 0) {
+					client[k] = clientfd;
+					break;
+				}
+			}
+
+			if (k == MAXNUMCLIENTS) {
+				std::cout << "too many clients" << std::endl;
+				return 0;
+			}
+
+			// also add new client to FD set
+			FD_SET(clientfd, &allset);
+			if (clientfd > maxfd) {
+				maxfd = clientfd;
+			} if ( maxk < k ) {
+				maxk = k;
+			}
+
+			// no available descriptors
+			if ( --numready <= 0 ) {
+				continue;
+			}
+		}
+
+		// check all clients for data
+		for ( k = 0; k <= maxk; k++ ) {
+			if ( (sockfd = client[k]) < 0 ){
+				continue;
+			} if ( FD_ISSET(sockfd, &rset) ) {
+
+				// if client closes connection
+				if ( (n = read(sockfd,buffer, MAXLINE) ) == 0 ) {
+					// close sockfd
+
+					FD_CLR(sockfd, &allset);
+					client[k] = -1;
+				} else {	// else client sent data
+
+					// interpret data from client
+					std::cout << "Client: " << buffer << std::flush;
+
+					// get the new data from client
+					deserializePacket(buffer, &message, attrList);
+
+					// initialize message and attributes to be sent over
+					attrList[0] = (SBCPAttribute*)malloc(sizeof(SBCPAttribute*));
+					createAttr(attrList[0],ATTR_TYPE_MESS,8);
+					char temp[8] = "abcdefg";
+					attrList[0]->payload = temp;
+					// strcpy(attrList[0].payload,"abcdefg");
+
+					createMess(&message,3,MESS_TYPE_FWD,4+4+attrList[0]->length);
+
+
+					// prepare buffer for sending (serialization)
+					serializePacket(buffer, MAXLINE, message,attrList,1);
+
+					std::cout << "Writing: " << buffer << std::flush;
+					write(sockfd, buffer, MAXLINE);
+
+
+					// reset all data structures: buffer, message, attrList
+					bzero(buffer,MAXLINE);
+					free(attrList[0]);
+				}
+
+				// if no more available descriptors
+				if ( --numready <= 0 ) {
+					break;
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
+
+=====================================================================================================
+|---------------------------------------------------------------------------------------------------|
+=====================================================================================================
+client.C
+
+
+// Chat Client
+// Written by: Ryan Hill
+
+//#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <string.h>
+#include <time.h>
+#include <iostream>
+
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+#include "headers.H"
+
+int writen(int, char*, int);
+int readline(int , char*, int );
+
+int main (int argc, char** argv) {
+
+	int 				SERVPORT, sockfd;//, serverfd;
+	int numSend = 0;
+	int numRecv = 0;
+	
+	int i;
+
+	struct sockaddr_in 	serv_addr;
+	char*				servAddrsString;
+	char*				username;
+	
+	ssize_t n;
+	fd_set rset,allset;
+	
+	std::string 		inputString;
+
+	size_t 				MAXLINE = 255;
+	char 				sendBuffer[MAXLINE];
+	char 				recvBuffer[MAXLINE];
+	uint8_t			buffer[MAXLINE];
+	
+	SBCPMessage			message;
+ 	SBCPAttribute*			attrList[16] = {0};
+
+	// Get IP addr and port number of server from command line
+	if (argc != 4){
+		std::cout << "Usage: echos [IPv4_addr] [port_no]\n" << std::endl;
+		return -1;
+	}
+
+	servAddrsString = argv[1];
+	std::cout << "IP_addr: " << servAddrsString << std::endl;
+
+	SERVPORT = atoi(argv[2]);
+	std::cout << "Port_Num: " << SERVPORT << std::endl;
+	
+	username = argv[3];
+	std::cout << "Username: " << username << std::endl;
+
+	// Preliminary stuff
+	bzero(&serv_addr,sizeof(serv_addr));
+	serv_addr.sin_family 		= AF_INET;				// use IPv4 protocol
+	serv_addr.sin_port 			= htons(SERVPORT);		// use portno provided by user
+	
+	if ( inet_pton(AF_INET, servAddrsString, &serv_addr.sin_addr) != 1 ) {
+		perror("inet_pton()");
+		return -1;
+	}
+
+	// Create socket
+	if ( (sockfd = socket(AF_INET,SOCK_STREAM,0)) < 0 ){
+		perror("socket()");
+		return -1;
+	}
+	std::cout << "Socket created successfully." << std::endl;
+
+	// Connect to server
+	if ( (connect(sockfd, (struct sockaddr*)&serv_addr,sizeof(serv_addr))) != 0 ) {
+		perror("connect()");
+		return -1;
+	}
+	std::cout << "Connected to server!" << std::endl;
+
+	// interact with server
+	
+	// start JOIN
+    message.vrsn=3;
+	message.type=MESS_TYPE_JOIN;
+	message.length=8;
+	createMess(&message,3,MESS_TYPE_JOIN,8);
+	
+	attrList = (SBCPAttribute*)malloc(sizeof(SBCPAttribute));
+	createAttr(&attrList[0],ATTR_TYPE_USER,8);
+	attrList[0].type = ATTR_TYPE_USER;
+ 	attrList[0].payload = username;
+	attrList[0].length = 8;
+
+    // change SBCP Message to Network Packet
+	serializePacket(buffer, MAXLINE, message,attrList,1);
+	
+	// Send Username Data
+	write(sockfd, buffer, MAXLINE);
+	
+	// Reset Data Structures
+	bzero(buffer,MAXLINE);
+	free(attrList);
+
+	// prepare data of chat message
+    message.vrsn=3;
+	message.type=MESS_TYPE_SEND;
+	message.length=520;
+	createMess(&message,3,MESS_TYPE_SEND,520);
+	
+	attrList = (SBCPAttribute*)malloc(sizeof(SBCPAttribute));
+	createAttr(&attrList[0],ATTR_TYPE_MESS,520);
+	char temp[520] = "default message";
+	attrList[0].type = ATTR_TYPE_USER;
+ 	attrList[0].payload = temp;
+	attrList[0].length = 8;
+
+	FD_SET(0, &rset); // add the keyboard input to the read_fds set
+	FD_SET(sockfd, &rset);// add the sockfd to the read_fds set
+
+	for(;;) {	
+		if (select(sockfd+1, &rset, NULL, NULL, NULL) == -1) {
+			perror("Select Error");
+			return -1;
+		}
+		for(i = 0; i <= sockfd; i++) {																					// find if there is data to read from server or keyboard
+			if (FD_ISSET(i, &rset)) {
+				if (i == 0) {																														//there is data to read from keyboard
+					fgets(sendBuffer, MAXLINE, stdin);
+	                if (sendBuffer[MAXLINE-1] == '\n') sendBuffer[MAXLINE-1] = '\0';					// chage data to network byte order
+					if (writen(sockfd, sendBuffer, MAXLINE) == -1) {
+						perror("Send Error");
+						return -1;
+					}
+				}
+				if (i == sockfd){																//there is data to read from server
+					if ( (n = recv(sockfd, recvBuffer, MAXLINE,0) ) <= 0 ) {
+						// close sockfd
+						FD_CLR(sockfd, &allset);
+						return -1;
+					} else {
+						// get the new data from server
+						deserializePacket(recvbuffer, &message, attrList);
+					}
+					recvbuffer[n] = '\0';
+					printf("%s\n",recvbuffer);
+				}
+				
+			}
+			
+			FD_SET(0, &rset);
+	        FD_SET(sockfd, &rset);
+		}
+	}
+	close(sockfd);
+
+    return 0;
+}
+
+// robust loop to send string across connection-based socket
+int writen(int sockfd, char* buffer, int length){
+
+	int		err = 0;
+	int		count = 0;	// keep track of how many chars the client sent to the server
+	
+	// write to socket descriptor
+	while ( count != length ) {
+		err = send(sockfd,buffer,length+1,0);
+
+		if (err == -1 && errno == EINTR) {
+			// try again if interrupted
+			continue;
+		} else if (err == -1) {
+			// break if more serious error
+			perror("writen()");
+			return -1;
+		}
+
+		// keep track of sent characters
+		count += err;
+
+		// should never happen
+		if (count > length) {
+			// printf("\nWRITEN() ERROR!");
+			return -1;
+		}
+	}
+
+	return count;
+
+}
+
+// robust readline from socket connection
+int readline(int sockfd, char* buffer, int bufferlength) {
+
+	int		err = 0;
+	int		count = 0;	// keep track of how many chars the client sent to the server
+
+	while ( count < bufferlength ) {
+
+		err = recv(sockfd, buffer, bufferlength, 0);
+
+		// if end of file, i.e. if no newline found in string
+		if ( strstr(buffer, "\n") != NULL ) {
+			break;
+		}
+
+		if (err == 0) { // also, end of file
+			break;
+		}
+
+		if (err == -1 && errno == EINTR) {
+			// try again if interrupted
+			continue;
+		} else if (err == -1) {
+			perror("readline()");
+			return -1;
+		}
+
+		count += err;
+
+
+		// should not happen
+		if (count > bufferlength) {
+			printf("\nREADLINE() ERROR!");
+			break;
+		}
+	}
+
+	return count;
+}
+
+=====================================================================================================
+|---------------------------------------------------------------------------------------------------|
+=====================================================================================================
