@@ -6,7 +6,7 @@ struct SBCPMessage;
 typedef struct SBCPAttribute{
 	uint16_t		type	:16;
 	uint16_t		length	:16;
-	char*		payload;
+	char* 			payload;
 } SBCPAttribute;
 
 
@@ -39,22 +39,40 @@ const int ATTR_TYPE_CLCT	= 3;
 
 
 // converts raw network traffic into SBCPMessage structure, returns the length of the entire message
-int deserializePacket(uint8_t* buffer, SBCPMessage* message, SBCPAttribute* attrList) {
+int deserializePacket(uint8_t* buffer, SBCPMessage* message, SBCPAttribute** attrList) {
 
-	uint8_t* 	end = (uint8_t*)message;
 
-	// Read outer layer of message
-	*end = buffer[0]; end++;
-	*end = buffer[1]; end++;
-	*end = buffer[2]; end++;
-	*end = buffer[3]; end++;
+	// number of bytes left to be read
+	int remainingLen = message->length;
+	// next  = address of next byte to be read
+	uint8_t* 	next = (uint8_t*)message;
+
+	int currentAttr = -1;
+
+	// Read outer layer of message (guaranteed 4 bytes)
+	*next = buffer[0]; next++; remainingLen--;
+	*next = buffer[1]; next++; remainingLen--;
+	*next = buffer[2]; next++; remainingLen--;
+	*next = buffer[3]; next++; remainingLen--;
+
+	// processing one or more attributes
+	while (remainingLen > 0) {
+
+		currentAttr++;
+
+		// read 4 bytes from next attribute
+		attrList[currentAttr] = (SBCPAttribute*)next;
+
+		
+
+	}
 
 
 }
 
 // converts SBCPMessage to sendable network packet.
 // returns pointer to next available free byte, NULL on error
-uint8_t* serializePacket(uint8_t* buffer, int MAXLINE, SBCPMessage message, SBCPAttribute* attr, int numAttr) {
+uint8_t* serializePacket(uint8_t* buffer, int MAXLINE, SBCPMessage message, SBCPAttribute** attrList, int numAttr) {
 
 	// reset the buffer
 	bzero(buffer,MAXLINE);
@@ -70,24 +88,32 @@ uint8_t* serializePacket(uint8_t* buffer, int MAXLINE, SBCPMessage message, SBCP
 	*end = temp[2]; end++;
 	*end = temp[3]; end++;
 
-
-	// uint8_t temp[sizeof(SBCPMessage)+numAttr*sizeof(SBCPAttribute)];
-	// uint8_t* temp2 = (uint8_t*)attr;
-	// strcpy(temp,(uint8_t*)&message);
-	// strcat(temp,temp2);
-
-
 	// add attributes to the buffer
 	for (int i = 0; i<numAttr; i++) {
 
-	}
+		temp = (uint8_t*)attrList[i];
 
-	// copy from temporary string to buffer provided by caller
-	// strcpy((char*)buffer,(char*)temp);
+		// append the ith attribute header
+		*end = temp[0]; end++;
+		*end = temp[1]; end++;
+		*end = temp[2]; end++;
+		*end = temp[3]; end++;
+
+		temp = (uint8_t*)(attrList[i]->payload);
+
+		for (int k = 0; k<(attrList[i]->length); k++ ){
+			*end = temp[k]; end++;
+		}
+		// *end = '\0'; end++;
+	}
 
 	return end;
 }
 
 void printMessage (SBCPMessage* message) {
 	std::cout << "\nMESSAGE:\nvrsn: " << message->vrsn << "\ntype: " << message->type << "\nlength: " << message->length << std::endl;
+}
+
+void printAttribute (SBCPAttribute* attr) {
+	std::cout << "\nMESSAGE:\ntype: " << attr->type << "\nlength: " << attr->length << "\npayload: "<< attr->payload << std::endl;
 }

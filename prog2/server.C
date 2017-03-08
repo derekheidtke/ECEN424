@@ -1,5 +1,5 @@
 // Echo Server
-// Written by: Derek Heidtke and Ryan Hill
+// Written by: Derek Heidtke
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -42,7 +42,7 @@ int main (int argc, char** argv) {
 	uint8_t*			end;
 
 	SBPCMessage			message;
-	SBCPAttribute*		attrList;
+	SBCPAttribute*		attrList[16] = {0};
 	int 				length;
 
 
@@ -154,21 +154,25 @@ int main (int argc, char** argv) {
 
 					FD_CLR(sockfd, &allset);
 					client[k] = -1;
-				} else {
+				} else {	// else client sent data
+
+					// interpret data from client
 					std::cout << "Client: " << buffer << std::flush;
 
 					// get the new data from client
 					deserializePacket(buffer, &message, attrList);
 
-					createMess(&message,0xFFF,0xFFF,0xFFF);
-					// createMess(&message,3,MESS_TYPE_FWD,1);
-
-					attrList = (SBCPAttribute*)malloc(sizeof(SBCPAttribute));
-					createAttr(&attrList[0],ATTR_TYPE_MESS,8);
+					// initialize message and attributes to be sent over
+					attrList[0] = (SBCPAttribute*)malloc(sizeof(SBCPAttribute*));
+					createAttr(attrList[0],ATTR_TYPE_MESS,8);
 					char temp[8] = "abcdefg";
-					attrList[0].payload = temp;
+					attrList[0]->payload = temp;
+					// strcpy(attrList[0].payload,"abcdefg");
+
+					createMess(&message,3,MESS_TYPE_FWD,4+4+attrList[0]->length);
 
 
+					// prepare buffer for sending (serialization)
 					serializePacket(buffer, MAXLINE, message,attrList,1);
 
 					std::cout << "Writing: " << buffer << std::flush;
@@ -177,7 +181,7 @@ int main (int argc, char** argv) {
 
 					// reset all data structures: buffer, message, attrList
 					bzero(buffer,MAXLINE);
-					free(attrList);
+					free(attrList[0]);
 				}
 
 				// if no more available descriptors
@@ -191,75 +195,75 @@ int main (int argc, char** argv) {
 	return 0;
 }
 
-// robust loop to send string across connection-based socket
-int writen(int listenfd, char* buffer, int length){
+// // robust loop to send string across connection-based socket
+// int writen(int listenfd, char* buffer, int length){
 
-	int		err = 0;
-	int		count = 0;	// keep track of how many chars the client sent to the server
+// 	int		err = 0;
+// 	int		count = 0;	// keep track of how many chars the client sent to the server
 	
-	// write to socket descriptor
-	while ( count != length ) {
-		err = send(listenfd,buffer,length+1,0);
+// 	// write to socket descriptor
+// 	while ( count != length ) {
+// 		err = send(listenfd,buffer,length+1,0);
 
-		if (err == -1 && errno == EINTR) {
-			// try again if interrupted
-			continue;
-		} else if (err == -1) {
-			// break if more serious error
-			perror("writen()");
-			return -1;
-		}
+// 		if (err == -1 && errno == EINTR) {
+// 			// try again if interrupted
+// 			continue;
+// 		} else if (err == -1) {
+// 			// break if more serious error
+// 			perror("writen()");
+// 			return -1;
+// 		}
 
-		// keep track of sent characters
-		count += err;
+// 		// keep track of sent characters
+// 		count += err;
 
-		// should never happen
-		if (count > length) {
-			// printf("\nWRITEN() ERROR!");
-			return -1;
-		}
-	}
+// 		// should never happen
+// 		if (count > length) {
+// 			// printf("\nWRITEN() ERROR!");
+// 			return -1;
+// 		}
+// 	}
 
-	return count;
+// 	return count;
 
-}
+// }
 
-// robust readline from socket connection
-int readline(int listenfd, char* buffer, int buflength) {
+// // robust readline from socket connection
+// int readline(int listenfd, char* buffer, int buflength) {
 
-	int		err = 0;
-	int		count = 0;	// keep track of how many chars the client sent to the server
+// 	int		err = 0;
+// 	int		count = 0;	// keep track of how many chars the client sent to the server
 
-	while ( count < buflength ) {
+// 	while ( count < buflength ) {
 
-		err = recv(listenfd, buffer, buflength, 0);
+// 		err = recv(listenfd, buffer, buflength, 0);
 
-		// if end of file, i.e. if no newline found in string
-		if ( strstr(buffer, "\n") != NULL ) {
-			break;
-		}
+// 		// if end of file, i.e. if no newline found in string
+// 		if ( strstr(buffer, "\n") != NULL ) {
+// 			break;
+// 		}
 
-		if (err == 0) { // also, end of file
-			break;
-		}
+// 		if (err == 0) { // also, end of file
+// 			break;
+// 		}
 
-		if (err == -1 && errno == EINTR) {
-			// try again if interrupted
-			continue;
-		} else if (err == -1) {
-			perror("readline()");
-			return -1;
-		}
+// 		if (err == -1 && errno == EINTR) {
+// 			// try again if interrupted
+// 			continue;
+// 		} else if (err == -1) {
+// 			perror("readline()");
+// 			return -1;
+// 		}
 
-		count += err;
+// 		count += err;
 
 
-		// should not happen
-		if (count > buflength) {
-			printf("\nREADLINE() ERROR!");
-			break;
-		}
-	}
+// 		// should not happen
+// 		if (count > buflength) {
+// 			printf("\nREADLINE() ERROR!");
+// 			break;
+// 		}
+// 	}
 
-	return count;
-}
+// 	return count;
+// }
