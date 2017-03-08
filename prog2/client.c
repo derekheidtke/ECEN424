@@ -1,5 +1,5 @@
-// Echo Client
-// Written by: Derek Heidtke and Ryan Hill
+// Chat Client
+// Written by: Ryan Hill
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -15,7 +15,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include "headers.H"
+#include "headers.h"
 
 int writen(int, char*, int);
 int readline(int , char*, int );
@@ -40,10 +40,10 @@ int main (int argc, char** argv) {
 	size_t 				MAXLINE = 255;
 	char 				sendBuffer[MAXLINE];
 	char 				recvBuffer[MAXLINE];
-	char				buffer[MAXLINE];
+	uint8_t			buffer[MAXLINE];
 	
 	SBCPMessage			message;
- 	SBCPAttribute*			attrList;
+ 	SBCPAttribute*			attrList[16] = {0};
 
 	// Get IP addr and port number of server from command line
 	if (argc != 4){
@@ -99,8 +99,6 @@ int main (int argc, char** argv) {
 	attrList[0].length = 8;
 
     // change SBCP Message to Network Packet
-	structToNetwork(buffer,message,attrList,1);
-	
 	serializePacket(buffer, MAXLINE, message,attrList,1);
 	
 	// Send Username Data
@@ -135,25 +133,23 @@ int main (int argc, char** argv) {
 			if (FD_ISSET(i, &rset)) {
 				if (i == 0) {																														//there is data to read from keyboard
 					fgets(sendBuffer, MAXLINE, stdin);
-	                if (sendBuffer[MAXLINE-1] == '\n') sendBuffer[MAXLINE-1] = '\0';		// chage data to network byte order
-					structToNetwork(buffer,message,attrList,1);																	// send chat message to server
+	                if (sendBuffer[MAXLINE-1] == '\n') sendBuffer[MAXLINE-1] = '\0';					// chage data to network byte order
 					if (writen(sockfd, sendBuffer, MAXLINE) == -1) {
 						perror("Send Error");
 						return -1;
 					}
 				}
 				if (i == sockfd){																//there is data to read from server
-					if ( (n = recv(sockfd,buffer, MAXLINE,0) ) <= 0 ) {
+					if ( (n = recv(sockfd, recvBuffer, MAXLINE,0) ) <= 0 ) {
 						// close sockfd
 						FD_CLR(sockfd, &allset);
 						return -1;
 					} else {
 						// get the new data from server
-						networkToStruct(buffer, &message, attrList);
-						deserializePacket(buffer, &message, attrList);
+						deserializePacket(recvbuffer, &message, attrList);
 					}
-					buffer[n] = '\0';
-					printf("%s\n",buffer);
+					recvbuffer[n] = '\0';
+					printf("%s\n",recvbuffer);
 				}
 				
 			}
