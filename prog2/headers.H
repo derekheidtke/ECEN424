@@ -1,29 +1,30 @@
+// Written by Derek Heidtke
 
 struct SBCPAttribute;
 struct SBCPMessage;
 
 typedef struct SBCPAttribute{
-	uint8_t		type	:2;
-	uint8_t		length	:2;
+	uint16_t		type	:16;
+	uint16_t		length	:16;
 	char*		payload;
 } SBCPAttribute;
 
 
 typedef struct SBCPMessage{
-	uint16_t	vrsn	:9;
-	uint8_t		type	:7;
-	uint8_t		length	:2;
+	uint16_t		vrsn	:9;
+	uint16_t		type	:7;
+	uint16_t		length	:16;
 } SBPCMessage;
 
 static inline void createMess (SBCPMessage* message,int vrsn, int type, int length) {
 	message->vrsn 	= (vrsn & 0x1FF);
 	message->type 	= (type & 0x7F);
-	message->length = (length & 0x3);
+	message->length = (length & 0xFFFF);
 }
 
 static inline void createAttr (SBCPAttribute* attr, int type, int length) {
-	attr->type 		= (type & 0x3);
-	attr->length 	= (length & 0x3);
+	attr->type 		= (type & 0xFFFF);
+	attr->length 	= (length & 0xFFFF);
 }
 
 
@@ -40,8 +41,13 @@ const int ATTR_TYPE_CLCT	= 3;
 // converts raw network traffic into SBCPMessage structure, returns the length of the entire message
 int deserializePacket(uint8_t* buffer, SBCPMessage* message, SBCPAttribute* attrList) {
 
+	uint8_t* 	end = (uint8_t*)message;
+
 	// Read outer layer of message
-	message = (SBCPMessage*)buffer;
+	*end = buffer[0]; end++;
+	*end = buffer[1]; end++;
+	*end = buffer[2]; end++;
+	*end = buffer[3]; end++;
 
 
 }
