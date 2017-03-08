@@ -9,14 +9,12 @@
 #include <string.h>
 #include <time.h>
 
-#include <iostream>
-
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include "headers.H"
+#include "headers.h"
 
 int writen(int, char*, int);
 int readline(int , char*, int );
@@ -26,19 +24,22 @@ int main (int argc, char** argv) {
 	int 				SERVPORT, sockfd;//, serverfd;
 	int numSend = 0;
 	int numRecv = 0;
+	
+	int i;
 
 	struct sockaddr_in 	serv_addr;
 	char*				servAddrsString;
 	char*				username;
 	
 	ssize_t n;
-	fd_set rset;
+	fd_set rset,allset;
 	
 	std::string 		inputString;
 
 	size_t 				MAXLINE = 255;
 	char 				sendBuffer[MAXLINE];
 	char 				recvBuffer[MAXLINE];
+	char				buffer[MAXLINE];
 	
 	SBCPMessage			message;
  	SBCPAttribute*			attrList;
@@ -92,9 +93,8 @@ int main (int argc, char** argv) {
 	
 	attrList = (SBCPAttribute*)malloc(sizeof(SBCPAttribute));
 	createAttr(&attrList[0],ATTR_TYPE_USER,8);
-	char temp[8] = username;
 	attrList[0].type = ATTR_TYPE_USER;
- 	attrList[0].payload = temp;
+ 	attrList[0].payload = username;
 	attrList[0].length = 8;
 
     // change SBCP Message to Network Packet
@@ -136,13 +136,13 @@ int main (int argc, char** argv) {
 					fgets(sendBuffer, MAXLINE, stdin);
 	                if (sendBuffer[MAXLINE-1] == '\n') sendBuffer[MAXLINE-1] = '\0';		// chage data to network byte order
 					structToNetwork(buffer,message,attrList,1);																	// send chat message to server
-					if (writen(sockfd, sendBuffer, MAXLINE); == -1) {
+					if (writen(sockfd, sendBuffer, MAXLINE) == -1) {
 						perror("Send Error");
 						return -1;
 					}
 				}
 				if (i == sockfd){																//there is data to read from server
-					if ( (n = read(sockfd,buffer, MAXLINE) ) == 0 ) {
+					if ( (n = recv(sockfd,buffer, MAXLINE,0) ) <= 0 ) {
 						// close sockfd
 						FD_CLR(sockfd, &allset);
 						return -1;
@@ -151,14 +151,14 @@ int main (int argc, char** argv) {
 						networkToStruct(buffer, &message, attrList);
 						deserializePacket(buffer, &message, attrList);
 					}
-					buffer[numbytes] = '\0';
+					buffer[n] = '\0';
 					printf("%s\n",buffer);
 				}
 				
 			}
 			
-			FD_SET(0, &read_fds);
-	        FD_SET(sockfd, &read_fds);
+			FD_SET(0, &rset);
+	        FD_SET(sockfd, &rset);
 		}
 	}
 	close(sockfd);
