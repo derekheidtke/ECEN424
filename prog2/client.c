@@ -100,7 +100,7 @@ int main (int argc, char** argv) {
     // change SBCP Message to Network Packet
 	structToNetwork(buffer,message,attrList,1);
 	
-	serializePacket(bufferfer, MAXLINE, message,attrList,1);
+	serializePacket(buffer, MAXLINE, message,attrList,1);
 	
 	// Send Username Data
 	write(sockfd, buffer, MAXLINE);
@@ -167,14 +167,14 @@ int main (int argc, char** argv) {
 }
 
 // robust loop to send string across connection-based socket
-int writen(int sockfd, char* bufferfer, int length){
+int writen(int sockfd, char* buffer, int length){
 
 	int		err = 0;
 	int		count = 0;	// keep track of how many chars the client sent to the server
 	
 	// write to socket descriptor
 	while ( count != length ) {
-		err = send(sockfd,bufferfer,length+1,0);
+		err = send(sockfd,buffer,length+1,0);
 
 		if (err == -1 && errno == EINTR) {
 			// try again if interrupted
@@ -200,17 +200,17 @@ int writen(int sockfd, char* bufferfer, int length){
 }
 
 // robust readline from socket connection
-int readline(int sockfd, char* bufferfer, int bufferlength) {
+int readline(int sockfd, char* buffer, int bufferlength) {
 
 	int		err = 0;
 	int		count = 0;	// keep track of how many chars the client sent to the server
 
 	while ( count < bufferlength ) {
 
-		err = recv(sockfd, bufferfer, bufferlength, 0);
+		err = recv(sockfd, buffer, bufferlength, 0);
 
 		// if end of file, i.e. if no newline found in string
-		if ( strstr(bufferfer, "\n") != NULL ) {
+		if ( strstr(buffer, "\n") != NULL ) {
 			break;
 		}
 
