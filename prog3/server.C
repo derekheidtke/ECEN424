@@ -54,9 +54,7 @@ int main (int argc, char** argv) {
 	}
 	servport = atoi(argv[1]);
 	std::cout << "Port_Num: " << servport << std::endl;
-	MAX_CLIENTS = atoi(argv[2]);
-	std::cout << "Max_Clients: " << MAX_CLIENTS << std::endl;
-
+	
 	// Preliminary stuff
 	bzero(&server_addr,sizeof(server_addr));
 	bzero(&client_addr,sizeof(client_addr));
@@ -76,120 +74,19 @@ int main (int argc, char** argv) {
 		return 0;
 	}
 	// std::cout << "Bind successful." << std::endl;
-	// Listen for clients on listening port
-	if ( (listen(listenfd,BACKLOG)) < 0 ) {
-		std::cout << strerror(errno) << std::endl;
-		return 0;
-	}
-	// std::cout << "Listen successful." << std::endl;
-
-	// initialize maxfd to listenfd file descriptor
-	maxfd = listenfd;
-	maxk = -1;
-
-	for ( k = 0 ; k < MAXNUMCLIENTS ; k++) {
-		client[k] = -1;
-	}
-	// initialize and turn on bit "listenfd"
-	FD_ZERO(&allset);
-	FD_SET(listenfd, &allset);
 
 	// processing loop
 	// accepts new clients, uses select to read/write to available client fds.
 	for (;;){
-		rset = allset;
 
-		// std::cout << "Selecting ...\n" << std::flush;
-		// check which clients are ready to be read from
-		if ((numready = select(maxfd+1, &rset, NULL, NULL, NULL) ) < 0) {
-			std::cout << strerror(errno) << std::endl;
-		}
-
-		// if there is a new connection
-		if (FD_ISSET(listenfd, &rset)) {
-
-			// accept client and get new file descriptor for it. them?
-			client_len = sizeof(client_addr);
-			if ((clientfd = accept(listenfd, (struct sockaddr*)&client_addr, &client_len)) < 0){
-				std::cout << strerror(errno) << std::endl;
-				return 0;
-			}
-		
-			// insert new client file descriptor into list of available descr. (client[])
-			for ( k = 0; k < MAXNUMCLIENTS ; k++) {
-				if (client[k] < 0) {
-					client[k] = clientfd;
-					break;
-				}
-			}
-
-			if (k == MAXNUMCLIENTS) {
-				std::cout << "too many clients" << std::endl;
-				return 0;
-			}
-
-			// also add new client to FD set
-			FD_SET(clientfd, &allset);
-			if (clientfd > maxfd) {
-				maxfd = clientfd;
-			} if ( maxk < k ) {
-				maxk = k;
-			}
-
-			// no available descriptors
-			if ( --numready <= 0 ) {
-				continue;
-			}
-		}
-
-		// check all clients for data
-		for ( k = 0; k <= maxk; k++ ) {
-			if ( (sockfd = client[k]) < 0 ){
-				continue;
-			} if ( FD_ISSET(sockfd, &rset) ) {
-
-				// if client closes connection
-				if ( (n = read(sockfd,buffer, MAXLINE) ) == 0 ) {
-					// close sockfd
-
-					FD_CLR(sockfd, &allset);
-					client[k] = -1;
-				} else {	// else client sent data
-
-					// interpret data from client
-					std::cout << "Client: " << buffer << std::flush;
-
-					// get the new data from client
-					deserializePacket(buffer, &message, attrList);
-
-					// initialize message and attributes to be sent over
-					attrList[0] = (SBCPAttribute*)malloc(sizeof(SBCPAttribute*));
-					createAttr(attrList[0],ATTR_TYPE_MESS,8);
-					char temp[8] = "abcdefg";
-					attrList[0]->payload = temp;
-					// strcpy(attrList[0].payload,"abcdefg");
-
-					createMess(&message,3,MESS_TYPE_FWD,4+4+attrList[0]->length);
+		// fork process to handle new client
 
 
-					// prepare buffer for sending (serialization)
-					serializePacket(buffer, MAXLINE, message,attrList,1);
+		// server child: recvfrom()
 
-					std::cout << "Writing: " << buffer << std::flush;
-					write(sockfd, buffer, MAXLINE);
+		// processing
 
-
-					// reset all data structures: buffer, message, attrList
-					bzero(buffer,MAXLINE);
-					free(attrList[0]);
-				}
-
-				// if no more available descriptors
-				if ( --numready <= 0 ) {
-					break;
-				}
-			}
-		}
+		// server child: sendto()
 	}
 
 	return 0;
