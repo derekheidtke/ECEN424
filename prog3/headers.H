@@ -194,7 +194,7 @@ int tftpRespondACK(TFTPMESSAGE* m, struct sockaddr* pcliaddr, CLIRECORD* clientI
 
 	// send the message
 	sendto(clientInfo->cliSockfd, buf, n+4, 0, pcliaddr, sizeof(struct sockaddr_in) );
-	std::cout << "\nSending segment of size, " << n << " to client." << std::flush;
+	std::cout << " >> Sending block number, " << sendData.seqNum << " ..." << std::flush;
 	
 	return 0;
 }
