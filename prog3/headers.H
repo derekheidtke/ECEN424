@@ -67,12 +67,16 @@ void make_tftp_message(int len, FILE* fp, char *&buffer, uint16_t opcode, uint16
 
 	// allocate new space for data
 	buffer = new char[size];
-	memset(buffer,'\0',size);				
+	memset(buffer,'\0',size);
+
+	// insert first two data fields: opcode, blcok number
 	opcode = htons(opcode);
-	memcpy(buffer, &opcode,2);			
 	seqNum = htons(seqNum);
-	memcpy(buffer+2, &seqNum,2);			
-	fread (buffer+4,1,len, fp);	
+	memcpy(buffer, &opcode,2);
+	memcpy(buffer+2, &seqNum,2);
+
+	// append file data to data packet
+	fread(buffer+4,1,len, fp);	
 }
 
 // send specified data file to specified client
@@ -127,7 +131,31 @@ int tftpRespondRRQ(TFTPMESSAGE* m, struct sockaddr* pcliaddr, CLIRECORD* clientI
 		std::cout << "\nSending segment of size, " << n << " to client." << std::flush;
 
 	} else { // error opening file
-		
+
+		std::cout << "\nCould not open file." << std::flush;
+
+		/* creat error message*/
+		uint16_t 	opcode 	= TFTP_ERR;
+		uint16_t 	errcode = 1;
+		int 		errSize = 100;
+
+		// allocate space for error message
+		char buffer[errSize];
+		memset(buffer,'\0',errSize);
+
+		// fill data fields with opcode, error code, and error message
+		opcode = htons(opcode);
+		errcode = htons(errcode);
+		memcpy(buffer, &opcode, 2);
+		memcpy(buffer+2, &errcode, 2);
+		memcpy(buffer+4,"File not Found",strlen("File not Found"));
+
+		sendto(clientInfo->cliSockfd, buffer, errSize, 0, pcliaddr, sizeof(struct sockaddr_in) );
+		// if( sendto(sd,buffer,errSize,0,(struct sockaddr *)&list[sd]->client_addr, addr_len)!=-1) {
+		// 	printf("send a error to client\n");
+		// } 
+
+		return -1; 		
 	}
 
 	return 0;
