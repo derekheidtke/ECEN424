@@ -16,68 +16,69 @@
 
 #include "headers.H"
 
-int writen(int, char*, int);
-int readline(int , char*, int );
-
 int main (int argc, char** argv) {
 
-	const int 			BACKLOG = 10;		// parameter for listen() call
-	size_t 				MAXLINE = 255;
-	int 				MAXNUMCLIENTS = 32;
-	int 				MAX_CLIENTS;
+	const int MAXLINE = 512;
 
-	int 				servport, listenfd, clientfd, sockfd, maxfd, maxk, numready, k;
-	int 				numSend = 0;
-	int 				numRecv = 0;
-	int 				client[MAXNUMCLIENTS];
-	ssize_t				n;
+	int 	servport, sockfd;
+	struct sockaddr_in servaddr, cliaddr;
 
-	fd_set				rset, allset;
-
-	struct sockaddr_in 	server_addr, client_addr;
-	socklen_t			client_len;
-	pid_t				child_pid;
-
-	uint8_t				buffer[MAXLINE];
-	uint8_t*			end;
-
-	SBPCMessage			message;
-	SBCPAttribute*		attrList[16] = {0};
-	int 				length;
-
+	char* servAddrIP;
 
 
 	// Get port number from command line
 	if (argc != 3){
-		std::cout << "Usage: server <port_no> <max_clients>\n" << std::endl;
+		std::cout << "Usage: server <IP_addr> <port_no>\n" << std::endl;
 		return 0;
 	}
-	servport = atoi(argv[1]);
-	std::cout << "Port_Num: " << servport << std::endl;
+	servAddrIP = argv[1];
+	servport = atoi(argv[2]);
+	// std::cout << servAddrIP << " " << servport << std::endl;
 	
-	// Preliminary stuff
-	bzero(&server_addr,sizeof(server_addr));
-	bzero(&client_addr,sizeof(client_addr));
-	server_addr.sin_family 		= AF_INET;				// use IPv4 protocol
-	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);	// use any interface
-	server_addr.sin_port 		= htons(servport);		// use portno provided by user
 
 	// Create socket
-	if ( (listenfd = socket(AF_INET,SOCK_STREAM,0)) < 0 ){
+	if ( (sockfd = socket(AF_INET,SOCK_DGRAM,0)) < 0 ){
+		std::cerr << "\nERROR: " << std::flush;
 		std::cout << strerror(errno) << std::endl;
 		return 0;
 	}
 	// std::cout << "Socket created successfully." << std::endl;
+
+	bzero(&servaddr,sizeof(servaddr));
+	servaddr.sin_family			= AF_INET;				// use UDP datagram Protocol
+	servaddr.sin_addr.s_addr	= htonl(INADDR_ANY);	// use any interface
+	servaddr.sin_port			= htons(servport);		// use portno provided by user
+
 	// Bind socket to port/IP address
-	if ( (bind(listenfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) ) != 0 ){
+	if ( (bind(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) ) != 0 ){
+		std::cerr << "\nERROR: " << std::flush;
 		std::cout << strerror(errno) << std::endl;
 		return 0;
 	}
 	// std::cout << "Bind successful." << std::endl;
 
-	// processing loop
-	// accepts new clients, uses select to read/write to available client fds.
 	for (;;){
+
+		int			n;
+		socklen_t	len;
+		char		mesg[MAXLINE];
+		TFTPMESSAGE	message;
+
+		n = recvfrom(sockfd, mesg, MAXLINE, 0, (struct sockaddr*) &cliaddr, &len);
+		if (n == -1){
+			std::cerr << "\nERROR: " << std::flush;
+			std::cout << strerror(errno) << std::endl;
+		}
+
+		tftpDecode(mesg, &message);
+
+		std::cout << "\nopcode: " << message.opcode << std::flush;
+		std::cout << "\nseqNum: " << message.seqNum << std::flush;
+		std::cout << "\nerror: "  << message.error  << std::flush;
+		std::cout << "\nfilename: " << message.filename << std::flush;
+
+		std::cout << "\n" << n << std::flush;
+		std::cout << "\n" << mesg << std::flush;
 
 		// fork process to handle new client
 
@@ -87,7 +88,9 @@ int main (int argc, char** argv) {
 		// processing
 
 		// server child: sendto()
-	}
+
+
+	} // forever loop
 
 	return 0;
 }
