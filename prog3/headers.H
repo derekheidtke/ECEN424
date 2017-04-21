@@ -82,9 +82,6 @@ void make_tftp_message(int len, FILE* fp, char *&buffer, uint16_t opcode, uint16
 // send specified data file to specified client
 int tftpRespondRRQ(TFTPMESSAGE* m, struct sockaddr* pcliaddr, CLIRECORD* clientInfo) {
 
-	// FILE* 	fp1;
-	// FILE*	fp2;
-	// char* 	buf;
 	int 			n;
 	std::string		bufstr;
 
@@ -124,7 +121,7 @@ int tftpRespondRRQ(TFTPMESSAGE* m, struct sockaddr* pcliaddr, CLIRECORD* clientI
 
 		make_tftp_message(n, clientInfo->fp1, buf, sendData.opcode, sendData.seqNum);
 
-		std::cout << "\nsendBuf: " << buf << std::flush;
+		// std::cout << "\nsendBuf: " << buf << std::flush;
 
 		// send the message
 		sendto(clientInfo->cliSockfd, buf, n+4, 0, pcliaddr, sizeof(struct sockaddr_in) );
@@ -151,9 +148,6 @@ int tftpRespondRRQ(TFTPMESSAGE* m, struct sockaddr* pcliaddr, CLIRECORD* clientI
 		memcpy(buffer+4,"File not Found",strlen("File not Found"));
 
 		sendto(clientInfo->cliSockfd, buffer, errSize, 0, pcliaddr, sizeof(struct sockaddr_in) );
-		// if( sendto(sd,buffer,errSize,0,(struct sockaddr *)&list[sd]->client_addr, addr_len)!=-1) {
-		// 	printf("send a error to client\n");
-		// } 
 
 		return -1; 		
 	}
@@ -168,13 +162,12 @@ int tftpRespondACK(TFTPMESSAGE* m, struct sockaddr* pcliaddr, CLIRECORD* clientI
 	std::cout << "\nReceived ACK for block number: " << m->seqNum << std::flush;
 
 	// update clientInfo
-	clientInfo->seqNum = m->seqNum;
+	clientInfo->seqNum = m->seqNum + 1;	// the NEXT data block
 
 	// start constructing the data to be sent
 	TFTPMESSAGE sendData;
-	sendData.seqNum = 1;
+	sendData.seqNum = clientInfo->seqNum;
 	sendData.opcode = TFTP_DAT;
-	std::cout << "\nFile opened successfully." << std::flush;
 
 	// open file from the end
 	clientInfo->fp2 = fopen(m->filename, "r");
@@ -196,9 +189,7 @@ int tftpRespondACK(TFTPMESSAGE* m, struct sockaddr* pcliaddr, CLIRECORD* clientI
 	clientInfo->n = n;
 
 	// finish making the message
-	// uint16_t 	size = 4 + n;
 	char*	buf;
-
 	make_tftp_message(n, clientInfo->fp1, buf, sendData.opcode, sendData.seqNum);
 
 	// send the message
@@ -207,39 +198,3 @@ int tftpRespondACK(TFTPMESSAGE* m, struct sockaddr* pcliaddr, CLIRECORD* clientI
 	
 	return 0;
 }
-
-
-// int send_message_rrq(int sd, tftp_message *received_data, map<int, info_client *> &list)
-// {
-//  	//FILE *fp, *fp_end;
-// 	char* buf;
-// 	int len;	
-// 	socklen_t addr_len=sizeof(struct sockaddr_in);
-// 	map<int, info_client *>::iterator it; 
-// 	printf("\n receive RRQ request frome client for file: %s\n",received_data->file_name);
-// 	printf("\n received_data->block_number0)- %d", received_data->block_number);
-// 	list[sd]->fp = fopen(received_data->file_name, "r");
-// 	if (list[sd]->fp==NULL) //file open fail
-// 	{
-// 		printf("Fail to open file\n"); 
-//	  // creat error message
-// 		uint16 opcode=ERROR;
-// 		uint16 errcode=1;
-// 		char errbuf[ERR_SIZE];
-// 		memset(errbuf,'\0',ERR_SIZE);
-// 		opcode = htons(opcode);
-// 		memcpy(errbuf, &opcode,2);
-// 		errcode = htons(errcode);
-// 		memcpy(errbuf+2, &errcode,2);
-// 		memcpy(errbuf+4,"File not Found",strlen("File not Found"));
-
-// 		if(sendto(sd,errbuf,ERR_SIZE,0,(struct sockaddr *)&list[sd]->client_addr, addr_len)!=-1)//send the error message
-// 		{
-// 			printf("send a error to client\n");
-// 		} 
-// 		it= list.find(sd);
-//   		list.erase (it);
-// 		return -1; 		
-// 	}	
-
-// }

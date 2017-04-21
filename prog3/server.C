@@ -134,13 +134,13 @@ int main (int argc, char** argv) {
 					tftpDecode(mesg, &message);
 
 					if (message.opcode == TFTP_ACK) {
-						std::cout << "\nWe got an ACK ... :| " << std::flush;
+						// std::cout << "\nWe got an ACK ... :| " << std::flush;
 
-						tftpRespondACK(&message, (struct sockaddr*)&cliaddr, &clientInfo);
+						tftpRespondACK(&message, (struct sockaddr*) &cliaddr, &clientInfo);
 
 						
 					} else if (message.opcode == TFTP_ERR) {
-						std::cout << "\nWe got an ERR ... :| " << std::flush;
+						// std::cout << "\nWe got an ERR ... :| " << std::flush;
 					} else if (message.opcode == TFTP_RRQ) {
 						std::cout << "\nWe got a redundant RRQ ... :| " << std::flush;
 					} else {
