@@ -12,7 +12,8 @@ Derek Heidtke
 	- debugging
 
 Ryan Hill
-	- 
+	- udpclient.c
+	- mistakenly worked on TFTP client, the simple udp message protocol was functional but had issues with compiling once file transfer was implemented
 
 ======================================================
 Test Cases:
