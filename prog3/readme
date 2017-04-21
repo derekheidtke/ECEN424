@@ -7,7 +7,9 @@ Derek Heidtke and Ryan Hill
 Roles:
 
 Derek Heidtke
-	- 
+	- server.C
+	- headers.H
+	- debugging
 
 Ryan Hill
 	- 
@@ -15,6 +17,10 @@ Ryan Hill
 ======================================================
 Test Cases:
 
+Application was tested using a simple linux TFTP client, 'tftp,' using the loopback IP addr 127.0.0.1 PNG image included with source code documents working condition of tftp server under the load of multiple clients. 
+
 
 ======================================================
 Architecture:
+
+server was designed to use the concurrency method, each new RRQ from a client would cause the main server app. to fork a child to handle the request.
