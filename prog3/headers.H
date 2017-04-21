@@ -5,56 +5,213 @@
 #define TFTP_ACK 4
 #define TFTP_ERR 5
 
+#define MAXLINE 512
+
 typedef struct TFTPMESSAGE {	
 	char filename[20];
 	uint16_t opcode, seqNum, error;
 } TFTPMESSAGE;
 
+typedef struct CLIRECORD
+{
+	int 		n;
+	uint16_t	seqNum;
+	int 		cliSockfd;
+	FILE 		*fp1, *fp2;
+	char 		filename[20];
+	struct 		timespec time;
+	int 		lastSegmentSent;
+	struct 		sockaddr_in cliaddr;
+} CLIRECORD;
 
+// translate/decode/copy incoming message from buffer to TFTPMESSAGE object
 int tftpDecode(char* buf, TFTPMESSAGE* m) {
-	uint16_t 	len = 0, i = 0, j = 0;
+
+	uint16_t 	offset, i, j;
 	char 		tmp[2];
 
-	// memset(c,'\0',2);
-	memcpy(tmp,buf,2);
-	// temp = (uint16_t *)c;
-	// m->opcode = ntohs(*temp);
-	m->opcode = ntohs( *((uint16_t*)tmp) );
-	len+=2;	
-	/* Read ACK Request message*/
-	if(m->opcode == TFTP_ACK)
-	{
-		// memset(c,'\0',2);
-		memcpy(tmp,buf+len,2);
-		// temp = (uint16_t *)c;
-		m->seqNum = ntohs(*((uint16_t*)tmp));
-		len+=2;
-		
-	}
-	
-	/* Read RRQ Request message*/
-	else if(m->opcode == TFTP_RRQ)
-	{
-		for(i=2, j=0; buf[i]!='\0'; i++, j++)
-		m->filename[j] = buf[i];
-		m->filename[j] = '\0';   
+	offset = 0;
+	i = 0;
+	j = 0;
 
-		printf("%s\n",m->filename);
-			
+	memcpy(tmp, buf, 2);
+	m->opcode = ntohs( *((uint16_t*)tmp) );
+	offset += 2;	
+
+	if(m->opcode == TFTP_ACK) {				// if ACK message
+		memcpy(tmp, buf+offset, 2);
+		m->seqNum = ntohs(*((uint16_t*)tmp));
+		offset += 2;
 		
-	}
-		
-	/* Read Error message*/
-	else if(m->opcode == TFTP_ERR)
-	{
-		// memset(c,'\0',2);
-		memcpy(tmp,buf+len,2);
-		// temp = (uint16_t *)c;
+	} else if(m->opcode == TFTP_RRQ) {		// if RRQ message
+		for(i=2, j=0; buf[i] != '\0'; i++, j++){
+			m->filename[j] = buf[i];
+		}
+		m->filename[j] = '\0';
+
+		// std::cout << "\n" << m->filename << std::flush;
+
+	} else if(m->opcode == TFTP_ERR) {		// if ERR message
+		memcpy(tmp, buf+offset, 2);
 		m->error = ntohs(*((uint16_t*)tmp));
-		len+=2;
-		
-		
-			
+		offset += 2;	
 	}
-	return 1;
+
+	return 0;
 }
+
+void make_tftp_message(int len, FILE* fp, char *&buffer, uint16_t opcode, uint16_t seqNum) {
+	
+	// size += len;
+	uint16_t size = 4 + len;
+
+	// allocate new space for data
+	buffer = new char[size];
+	memset(buffer,'\0',size);				
+	opcode = htons(opcode);
+	memcpy(buffer, &opcode,2);			
+	seqNum = htons(seqNum);
+	memcpy(buffer+2, &seqNum,2);			
+	fread (buffer+4,1,len, fp);	
+}
+
+// send specified data file to specified client
+int tftpRespondRRQ(TFTPMESSAGE* m, struct sockaddr* pcliaddr, CLIRECORD* clientInfo) {
+
+	// FILE* 	fp1;
+	// FILE*	fp2;
+	// char* 	buf;
+	int 			n;
+	std::string		bufstr;
+
+	std::cout << "\nSending file: <" << m->filename << "> to client." << std::flush;
+
+	// open the file from the beginning
+	clientInfo->fp1 = fopen(m->filename, "r");
+	if (clientInfo->fp1 != NULL) {	// file opened successfully
+		
+		// start constructing the data to be sent
+		TFTPMESSAGE sendData;
+		sendData.seqNum = 1;
+		sendData.opcode = TFTP_DAT;
+		std::cout << "\nFile opened successfully." << std::flush;
+
+		// open file from the end
+		clientInfo->fp2 = fopen(m->filename, "r");
+		if (clientInfo->fp2 == NULL) {
+			std::cerr << "\nERROR: " << strerror(errno) << std::endl;
+			return 0;
+		}
+		fseek(clientInfo->fp2, 0, SEEK_END);
+
+		// find the difference
+		n = ftell(clientInfo->fp2) - ftell(clientInfo->fp1);
+
+		// updata clientInfo
+		if (n >= MAXLINE) {
+			n = MAXLINE;
+		} else {
+			clientInfo->lastSegmentSent = 1;
+		}
+		clientInfo->n = n;
+
+		// // finish making the message
+		char* 	buf;
+
+		make_tftp_message(n, clientInfo->fp1, buf, sendData.opcode, sendData.seqNum);
+
+		std::cout << "\nsendBuf: " << buf << std::flush;
+
+		// send the message
+		sendto(clientInfo->cliSockfd, buf, n+4, 0, pcliaddr, sizeof(struct sockaddr_in) );
+		std::cout << "\nSending segment of size, " << n << " to client." << std::flush;
+
+	} else { // error opening file
+		
+	}
+
+	return 0;
+}
+
+int tftpRespondACK(TFTPMESSAGE* m, struct sockaddr* pcliaddr, CLIRECORD* clientInfo) {
+
+	int 	n;
+
+	std::cout << "\nReceived ACK for block number: " << m->seqNum << std::flush;
+
+	// update clientInfo
+	clientInfo->seqNum = m->seqNum;
+
+	// start constructing the data to be sent
+	TFTPMESSAGE sendData;
+	sendData.seqNum = 1;
+	sendData.opcode = TFTP_DAT;
+	std::cout << "\nFile opened successfully." << std::flush;
+
+	// open file from the end
+	clientInfo->fp2 = fopen(m->filename, "r");
+	if (clientInfo->fp2 == NULL) {
+		std::cerr << "\nERROR: " << strerror(errno) << std::endl;
+		return 0;
+	}
+	fseek(clientInfo->fp2, 0, SEEK_END);
+
+	// find the difference
+	n = ftell(clientInfo->fp2) - ftell(clientInfo->fp1);
+
+	// updata clientInfo
+	if (n >= MAXLINE) {
+		n = MAXLINE;
+	} else {
+		clientInfo->lastSegmentSent = 1;
+	}
+	clientInfo->n = n;
+
+	// finish making the message
+	// uint16_t 	size = 4 + n;
+	char*	buf;
+
+	make_tftp_message(n, clientInfo->fp1, buf, sendData.opcode, sendData.seqNum);
+
+	// send the message
+	sendto(clientInfo->cliSockfd, buf, n+4, 0, pcliaddr, sizeof(struct sockaddr_in) );
+	std::cout << "\nSending segment of size, " << n << " to client." << std::flush;
+	
+	return 0;
+}
+
+
+// int send_message_rrq(int sd, tftp_message *received_data, map<int, info_client *> &list)
+// {
+//  	//FILE *fp, *fp_end;
+// 	char* buf;
+// 	int len;	
+// 	socklen_t addr_len=sizeof(struct sockaddr_in);
+// 	map<int, info_client *>::iterator it; 
+// 	printf("\n receive RRQ request frome client for file: %s\n",received_data->file_name);
+// 	printf("\n received_data->block_number0)- %d", received_data->block_number);
+// 	list[sd]->fp = fopen(received_data->file_name, "r");
+// 	if (list[sd]->fp==NULL) //file open fail
+// 	{
+// 		printf("Fail to open file\n"); 
+//	  // creat error message
+// 		uint16 opcode=ERROR;
+// 		uint16 errcode=1;
+// 		char errbuf[ERR_SIZE];
+// 		memset(errbuf,'\0',ERR_SIZE);
+// 		opcode = htons(opcode);
+// 		memcpy(errbuf, &opcode,2);
+// 		errcode = htons(errcode);
+// 		memcpy(errbuf+2, &errcode,2);
+// 		memcpy(errbuf+4,"File not Found",strlen("File not Found"));
+
+// 		if(sendto(sd,errbuf,ERR_SIZE,0,(struct sockaddr *)&list[sd]->client_addr, addr_len)!=-1)//send the error message
+// 		{
+// 			printf("send a error to client\n");
+// 		} 
+// 		it= list.find(sd);
+//   		list.erase (it);
+// 		return -1; 		
+// 	}	
+
+// }

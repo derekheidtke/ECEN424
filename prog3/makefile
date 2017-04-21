@@ -4,5 +4,8 @@ server: server.C
 test:
 	./server 127.0.0.1 47777
 
+db:
+	gdb
+
 clean:
 	rm "server"
