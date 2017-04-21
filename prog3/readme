@@ -1,20 +1,28 @@
 
 Programming Assignment 3
 
-Derek Heidtke and Ryan Hill
+Lab Group: Derek Heidtke and Ryan Hill
 
 ======================================================
 Roles:
 
 Derek Heidtke
-	- 
+	- server.C
+	- headers.H
+	- debugging
 
 Ryan Hill
-	- 
+	- udpclient.c
+	- mistakenly worked on TFTP client, the simple udp message protocol was functional but had issues with compiling once file transfer was implemented
 
 ======================================================
 Test Cases:
 
+Application was tested using a simple linux TFTP client, 'tftp,' using the loopback IP addr 127.0.0.1. The PNG image included with the source code documents the working condition of the tftp server under the load of multiple clients. During transmission, the server verbosely logs the activity of each running child process. Additionally, you can verify that the files received by the clients are indeed exact copies of the files stored in the server's directory.
 
+Was not able to implement the timeout timer; however, the basic stop-and-wait protocol is preserved. There is essentially no delay when the client and server are on the same machine. anyway.
 ======================================================
 Architecture:
+
+The server was designed to use the concurrency method, i.e each new RRQ from a client would cause the main server appl. to fork a child to handle the request. When the server child finishes distributing the requested data file, it terminates. All communication is done over sockets using UDP and the functions sendto() and recvfrom().
+Maximum packet size was chosen to be 512B (as specified by the lab manual). Only RRQ, ACK, DATA, and ERRmessages were implemented.
